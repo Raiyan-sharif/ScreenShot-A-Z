@@ -20,6 +20,7 @@ final class ScreenshotDetailsViewController: UIViewController {
     private let textView = UITextView()
 
     private var previewRequestID: PHImageRequestID?
+    private var imageDataRequestID: PHImageRequestID?
     private var ocrCancelled = false
     private var ocrTask: Task<Void, Never>?
 
@@ -39,6 +40,9 @@ final class ScreenshotDetailsViewController: UIViewController {
         ocrCancelled = true
         if let previewRequestID {
             imageManager.cancelImageRequest(previewRequestID)
+        }
+        if let imageDataRequestID {
+            imageManager.cancelImageRequest(imageDataRequestID)
         }
         ocrTask?.cancel()
     }
@@ -170,7 +174,7 @@ final class ScreenshotDetailsViewController: UIViewController {
     }
 
     private func loadPreviewAndRunOCR() {
-        let maxSide: CGFloat = 1500
+        let maxSide: CGFloat = 1800
         let w = CGFloat(asset.pixelWidth)
         let h = CGFloat(asset.pixelHeight)
         let scale = min(1, maxSide / max(w, h, 1))
@@ -196,6 +200,18 @@ final class ScreenshotDetailsViewController: UIViewController {
                 self.runOCR(on: image)
             }
         }
+
+        let dataOptions = PHImageRequestOptions()
+        dataOptions.deliveryMode = .highQualityFormat
+        dataOptions.isNetworkAccessAllowed = true
+        dataOptions.version = .current
+        imageDataRequestID = imageManager.requestImageDataAndOrientation(for: asset, options: dataOptions) { [weak self] data, _, _, _ in
+            Task { @MainActor in
+                guard let self else { return }
+                guard let data, let fullImage = UIImage(data: data) else { return }
+                self.runOCR(on: fullImage)
+            }
+        }
     }
 
     private func runOCR(on image: UIImage) {
@@ -212,7 +228,7 @@ final class ScreenshotDetailsViewController: UIViewController {
                 textStatusLabel.text = "No text detected"
                 textView.text = ""
             } else {
-                textStatusLabel.text = "Extracted text"
+                textStatusLabel.text = "Extracted text (full scan)"
                 textView.text = result
             }
         }

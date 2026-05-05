@@ -28,7 +28,15 @@ enum ScreenshotTextRecognizer {
                         return
                     }
                     let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
-                    let lines = observations.compactMap { $0.topCandidates(1).first?.string }
+                    let sorted = observations.sorted { lhs, rhs in
+                        let yDiff = abs(lhs.boundingBox.midY - rhs.boundingBox.midY)
+                        if yDiff > 0.02 {
+                            // Vision coordinates have origin at bottom-left.
+                            return lhs.boundingBox.midY > rhs.boundingBox.midY
+                        }
+                        return lhs.boundingBox.minX < rhs.boundingBox.minX
+                    }
+                    let lines = sorted.compactMap { $0.topCandidates(1).first?.string }
                     let text = lines.joined(separator: "\n")
                     resumeOnce(text.isEmpty ? "" : text)
                 }
