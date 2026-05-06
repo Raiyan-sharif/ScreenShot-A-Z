@@ -31,6 +31,17 @@ final class ScreenshotThumbnailCell: UICollectionViewCell {
         return b
     }()
 
+    private let favoriteBadge: UIImageView = {
+        let image = UIImageView(image: UIImage(systemName: "star.fill"))
+        image.tintColor = .systemYellow
+        image.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        image.layer.cornerRadius = 12
+        image.clipsToBounds = true
+        image.contentMode = .center
+        image.isHidden = true
+        return image
+    }()
+
     var onLongPress: (() -> Void)?
     private var longPress: UILongPressGestureRecognizer?
     private var requestID: PHImageRequestID?
@@ -40,8 +51,10 @@ final class ScreenshotThumbnailCell: UICollectionViewCell {
         super.init(frame: frame)
         contentView.addSubview(photoImageView)
         contentView.addSubview(menuButton)
+        contentView.addSubview(favoriteBadge)
         photoImageView.translatesAutoresizingMaskIntoConstraints = false
         menuButton.translatesAutoresizingMaskIntoConstraints = false
+        favoriteBadge.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             photoImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             photoImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -51,6 +64,10 @@ final class ScreenshotThumbnailCell: UICollectionViewCell {
             menuButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
             menuButton.widthAnchor.constraint(equalToConstant: 28),
             menuButton.heightAnchor.constraint(equalToConstant: 28),
+            favoriteBadge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+            favoriteBadge.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            favoriteBadge.widthAnchor.constraint(equalToConstant: 24),
+            favoriteBadge.heightAnchor.constraint(equalToConstant: 24),
         ])
         photoImageView.isUserInteractionEnabled = true
         let lp = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
@@ -69,6 +86,7 @@ final class ScreenshotThumbnailCell: UICollectionViewCell {
         imageManager: PHCachingImageManager,
         targetSize: CGSize,
         menu: UIMenu?,
+        isFavorite: Bool,
         onLongPress: @escaping () -> Void
     ) {
         if let requestID {
@@ -79,6 +97,7 @@ final class ScreenshotThumbnailCell: UICollectionViewCell {
         self.onLongPress = onLongPress
         menuButton.menu = menu
         menuButton.showsMenuAsPrimaryAction = true
+        favoriteBadge.isHidden = !isFavorite
 
         let opts = PHImageRequestOptions()
         opts.deliveryMode = .opportunistic
@@ -111,6 +130,7 @@ final class ScreenshotThumbnailCell: UICollectionViewCell {
         requestID = nil
         photoImageView.image = nil
         menuButton.menu = nil
+        favoriteBadge.isHidden = true
         onLongPress = nil
     }
 }

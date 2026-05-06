@@ -7,13 +7,23 @@ import UIKit
 import Vision
 
 enum ScreenshotTextRecognizer {
-    /// Returns recognized text, empty string if none, or an error message on failure. `nil` if cancelled before completion.
-    static func recognizeText(in image: UIImage, cancellation: @escaping @Sendable () -> Bool) async -> String? {
+    struct RecognizedLine {
+        let text: String
+        let boundingBox: CGRect // normalized Vision coordinates
+    }
+
+    struct Result {
+        let text: String
+        let lines: [RecognizedLine]
+    }
+
+    /// Returns recognized text data, or nil if cancelled before completion.
+    static func recognizeText(in image: UIImage, cancellation: @escaping @Sendable () -> Bool) async -> Result? {
         guard let cgImage = image.cgImage else { return nil }
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 var resumed = false
-                func resumeOnce(_ value: String?) {
+                func resumeOnce(_ value: Result?) {
                     if resumed { return }
                     resumed = true
                     continuation.resume(returning: value)
@@ -24,7 +34,7 @@ enum ScreenshotTextRecognizer {
                         return
                     }
                     if let error {
-                        resumeOnce(error.localizedDescription)
+                        resumeOnce(Result(text: error.localizedDescription, lines: []))
                         return
                     }
                     let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
@@ -36,9 +46,12 @@ enum ScreenshotTextRecognizer {
                         }
                         return lhs.boundingBox.minX < rhs.boundingBox.minX
                     }
-                    let lines = sorted.compactMap { $0.topCandidates(1).first?.string }
-                    let text = lines.joined(separator: "\n")
-                    resumeOnce(text.isEmpty ? "" : text)
+                    let lines: [RecognizedLine] = sorted.compactMap {
+                        guard let text = $0.topCandidates(1).first?.string else { return nil }
+                        return RecognizedLine(text: text, boundingBox: $0.boundingBox)
+                    }
+                    let text = lines.map(\.text).joined(separator: "\n")
+                    resumeOnce(Result(text: text, lines: lines))
                 }
                 request.recognitionLevel = .accurate
                 request.usesLanguageCorrection = true
@@ -49,7 +62,7 @@ enum ScreenshotTextRecognizer {
                     if cancellation() {
                         resumeOnce(nil)
                     } else {
-                        resumeOnce(error.localizedDescription)
+                        resumeOnce(Result(text: error.localizedDescription, lines: []))
                     }
                 }
             }
